@@ -1,0 +1,34 @@
+#!/bin/bash
+src=$1
+dst=$2
+log="$(date +%Y-%m-%d_%H-%M-%S.log)"
+function log(){
+	echo $(date) "$1" >> "$log"
+}
+function mnt_up () {
+	M=$(timeout 1 stat -t "$1" 2>&1) && return 0 || return 1
+}
+function teardown() {
+	log "Stopping sync process"
+	kill -s TERM "$child" 2> /dev/null
+	log "Stopped sync process"
+	exit 1
+}
+log "Starting sync $src -> $dst"
+rclone sync -v --transfers=10 --create-empty-src-dirs --order-by name "$src" "$dst" &>>"$log" &
+child=$!
+
+trap teardown INT TERM
+
+while kill -0 $child 2> /dev/null; do
+	if ! mnt_up "$src"
+	then
+		log "$src unavailable!!"
+		teardown
+	fi
+	sleep 10s
+done
+log "Finished syncing $src -> $dst"
+
+trap - EXIT
+
