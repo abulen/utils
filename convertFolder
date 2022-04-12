@@ -1,0 +1,101 @@
+#!/bin/bash
+###################################################################
+#Script Name	:convertFolder                                                                                             
+#Description	:converts all video files in directory to web
+#                optimized MP4: H264, 2 channel AAC
+#		 and updates metadata title to filename
+#Requires	:ffmpeg, mediainfo
+#Args           :-a set all options on conversion regardless of checks
+#Author       	:Andrew Bulen                                                
+#Email         	:anbulen@gmail.com                                           
+###################################################################
+
+# check flags passed
+all=0
+if [ $# -ne 0 ]
+then
+	echo "$1"
+	if [ $1 == "-a" ]
+	then
+		echo "updating all files"
+		all=1
+	fi
+fi
+pd=$(pwd)
+cnv="$pd/cnv"
+comp="$pd/orig"
+# locate known video file extensions
+find *.avi *.mkv *.m4v *.mpeg *.mp4 *.MP4 *.flv -type f | while read f
+do 
+	aac=1
+	x264=1
+	ch2=1
+	mkout=0
+	# check for aac
+	echo "checking file $f"
+	if ! [[ $(mediainfo "$f" | grep AAC) ]]
+	then
+		echo "$f not AAC"
+		aac=0
+		mkout=1
+	fi
+	# check for x264
+	if ! [[ $(mediainfo "$f" | grep x264) ]]
+	then
+		echo "$f not x264"
+		x264=0
+		mkout=1
+	fi
+	# check for 6 channel audio
+	if [[ $(mediainfo "$f" | grep 6\ channels) ]]
+	then
+		echo "$f has 6 channel audio"
+		ch2=0
+		mkout=1
+	fi
+	# check for convert all
+	if [ $all -eq 1 ]			
+	then
+		mkout=1
+	fi
+	outfile="$cnv/${f%.*}.mp4"
+
+	# if conversion need check for output folders
+	if [ $mkout -eq 1 ]
+	then
+		if [ ! -d "$cnv" ]; then
+			mkdir "$cnv"
+		fi
+		if [ ! -d "$comp" ]; then
+			mkdir "$comp"
+		fi
+	fi
+	# update video format
+	if [ $x264 -eq 0 ]
+	then
+		echo "updating video codec"
+		ffmpeg -i "$f" -map 0 -movflags faststart -vcodec libx264 -preset medium -vprofile high -crf 18 -acodec aac -strict experimental -r 29.97 -b 255k -ar 48000 -ac 2 -metadata title="${f%.*}" -metadata album="" -nostdin "$outfile"
+		echo "file saved to $outfile"
+	else
+		# update audio format
+		if [ $aac -eq 0 -o $ch2 -eq 0 ]
+		then
+			echo "updating audio"
+			ffmpeg -i "$f" -map 0 -movflags faststart -vcodec copy -acodec aac -strict experimental -ar 48000 -ac 2 -metadata title="${f%.*}" -metadata album="" -nostdin "$outfile"
+			echo "file saved to $outfile"
+		else
+			# update container
+			if [ $all -eq 1 ]
+			then
+				echo "updating metadata/container"
+				ffmpeg -i "$f" -map 0 -movflags faststart -acodec copy -vcodec copy -scodec copy -metadata title="${f%.*}" -metadata album="" -nostdin "$outfile"
+				echo "file saved to $outfile"
+			fi
+		fi
+	fi
+	# if file converted move source
+	if [ -f "$outfile" ]; then
+		mv "$f" "$comp/"
+	fi
+done
+

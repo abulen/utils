@@ -1,4 +1,15 @@
 #!/bin/bash
+###################################################################
+#Script Name    :sync
+#Description    :syncs source directory to destination directory
+#                while monitoring source for disconnects.
+#		 Kills sync process if source disconnected
+#Requires       :rclone
+#Args           :<source directory/mount> <destination directory/remote>
+#Author         :Andrew Bulen
+#Email          :anbulen@gmail.com
+###################################################################
+
 src=$1
 dst=$2
 log="$(date +%Y-%m-%d_%H-%M-%S.log)"
